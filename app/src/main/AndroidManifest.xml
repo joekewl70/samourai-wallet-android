@@ -181,14 +181,13 @@
             android:configChanges="keyboardHidden|orientation|screenSize"
             android:screenOrientation="landscape" />
 
-        <service
-            android:name=".service.WebSocketService"
-            android:enabled="true" />
+
         <service
             android:name=".tor.TorService"
             android:enabled="true"
             android:stopWithTask="true" />
         <service android:name=".service.JobRefreshService" android:permission="android.permission.BIND_JOB_SERVICE" />
+        <service android:name=".service.WebSocketJobService"  android:permission="android.permission.BIND_JOB_SERVICE" />
         <!--
                 <receiver
                     android:name=".receivers.BootIntentReceiver"
