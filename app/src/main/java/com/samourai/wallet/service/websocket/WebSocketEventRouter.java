@@ -8,6 +8,7 @@ import com.samourai.wallet.service.websocket.events.SocketEvent;
 import com.samourai.wallet.service.websocket.events.SocketFailureEvent;
 import com.samourai.wallet.service.websocket.events.SocketMessageEvent;
 import com.samourai.wallet.service.websocket.events.SocketOpenEvent;
+import com.samourai.wallet.util.LogUtil;
 
 import io.reactivex.FlowableEmitter;
 import okhttp3.Response;
@@ -61,7 +62,7 @@ public class WebSocketEventRouter extends WebSocketListener {
 
     @Override
     public void onFailure(WebSocket webSocket, Throwable t, Response response) {
-        Log.i(TAG, "onFailure: ".concat(t.getMessage()));
+        LogUtil.info(TAG, "onFailure: ".concat(t.getMessage()));
 //        Log.i(TAG, "onFailure: ".concat(response.toString()));
         if (!emitter.isCancelled()) {
             emitter.onNext(new SocketFailureEvent(t, response));

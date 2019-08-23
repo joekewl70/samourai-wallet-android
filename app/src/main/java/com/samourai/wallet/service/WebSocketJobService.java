@@ -15,21 +15,21 @@ import java.util.List;
 public class WebSocketJobService extends JobService {
 
     private static final String TAG = "WebSocketJobService";
-    private WebSocketHandlerHelper webSocketHandlerHelper;
+    private WebSocketHandler webSocketHandler;
     public static int JOB_ID = 19;
 
     @Override
     public boolean onStartJob(JobParameters jobParameters) {
          LogUtil.debug(TAG, "onStartJob: ");
-        webSocketHandlerHelper = new WebSocketHandlerHelper(getApplicationContext());
-        webSocketHandlerHelper.onStart();
+        webSocketHandler = new WebSocketHandler(getApplicationContext());
+        webSocketHandler.onStart();
         return true;
     }
 
     @Override
     public boolean onStopJob(JobParameters jobParameters) {
         LogUtil.debug(TAG, "onStopJob: ");
-        webSocketHandlerHelper.onStop();
+        webSocketHandler.onStop();
         return false;
     }
 
