@@ -21,11 +21,10 @@ import com.samourai.wallet.access.AccessFactory;
 import com.samourai.wallet.api.APIFactory;
 import com.samourai.wallet.crypto.AESUtil;
 import com.samourai.wallet.home.BalanceActivity;
-import com.samourai.wallet.network.dojo.DojoUtil;
 import com.samourai.wallet.payload.PayloadUtil;
 import com.samourai.wallet.prng.PRNGFixes;
 import com.samourai.wallet.service.BackgroundManager;
-import com.samourai.wallet.service.WebSocketService;
+import com.samourai.wallet.service.WebSocketJobService;
 import com.samourai.wallet.tor.TorManager;
 import com.samourai.wallet.util.AppUtil;
 import com.samourai.wallet.util.CharSequenceX;
@@ -62,58 +61,52 @@ public class MainActivity2 extends Activity {
             if (ACTION_RESTART.equals(intent.getAction())) {
 
 //                ReceiversUtil.getInstance(MainActivity2.this).initReceivers();
-
-                if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) {
-                    if (AppUtil.getInstance(MainActivity2.this.getApplicationContext()).isServiceRunning(WebSocketService.class)) {
-                        stopService(new Intent(MainActivity2.this.getApplicationContext(), WebSocketService.class));
-                    }
-                    startService(new Intent(MainActivity2.this.getApplicationContext(), WebSocketService.class));
-                }
+                WebSocketJobService.startJobService(getApplicationContext());
 
             }
 
         }
     };
 
-    protected BackgroundManager.Listener bgListener = new BackgroundManager.Listener() {
-
-        public void onBecameForeground() {
-
-            Intent intent = new Intent("com.samourai.wallet.BalanceFragment.REFRESH");
-            intent.putExtra("notifTx", false);
-            LocalBroadcastManager.getInstance(MainActivity2.this.getApplicationContext()).sendBroadcast(intent);
-
-            Intent _intent = new Intent("com.samourai.wallet.MainActivity2.RESTART_SERVICE");
-            LocalBroadcastManager.getInstance(MainActivity2.this.getApplicationContext()).sendBroadcast(_intent);
-
-        }
-
-        public void onBecameBackground() {
-
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                if (AppUtil.getInstance(MainActivity2.this.getApplicationContext()).isServiceRunning(WebSocketService.class)) {
-                    stopService(new Intent(MainActivity2.this.getApplicationContext(), WebSocketService.class));
-                }
-            }
-
-            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) {
-                new Thread(new Runnable() {
-                    @Override
-                    public void run() {
-
-                        try {
-                            PayloadUtil.getInstance(MainActivity2.this).saveWalletToJSON(new CharSequenceX(AccessFactory.getInstance(MainActivity2.this).getGUID() + AccessFactory.getInstance(MainActivity2.this).getPIN()));
-                        } catch (Exception e) {
-                            ;
-                        }
-
-                    }
-                }).start();
-            }
-
-        }
-
-    };
+//    protected BackgroundManager.Listener bgListener = new BackgroundManager.Listener() {
+//
+//        public void onBecameForeground() {
+//
+//            Intent intent = new Intent("com.samourai.wallet.BalanceFragment.REFRESH");
+//            intent.putExtra("notifTx", false);
+//            LocalBroadcastManager.getInstance(MainActivity2.this.getApplicationContext()).sendBroadcast(intent);
+//
+//            Intent _intent = new Intent("com.samourai.wallet.MainActivity2.RESTART_SERVICE");
+//            LocalBroadcastManager.getInstance(MainActivity2.this.getApplicationContext()).sendBroadcast(_intent);
+//
+//        }
+//
+//        public void onBecameBackground() {
+//
+//            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+//                if (AppUtil.getInstance(MainActivity2.this.getApplicationContext()).isServiceRunning(WebSocketService.class)) {
+//                    stopService(new Intent(MainActivity2.this.getApplicationContext(), WebSocketService.class));
+//                }
+//            }
+//
+//            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) {
+//                new Thread(new Runnable() {
+//                    @Override
+//                    public void run() {
+//
+//                        try {
+//                            PayloadUtil.getInstance(MainActivity2.this).saveWalletToJSON(new CharSequenceX(AccessFactory.getInstance(MainActivity2.this).getGUID() + AccessFactory.getInstance(MainActivity2.this).getPIN()));
+//                        } catch (Exception e) {
+//                            ;
+//                        }
+//
+//                    }
+//                }).start();
+//            }
+//
+//        }
+//
+//    };
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -130,7 +123,7 @@ public class MainActivity2 extends Activity {
         }
 
 //        if(Build.VERSION.SDK_INT < Build.VERSION_CODES.O) {
-        BackgroundManager.get(MainActivity2.this).addListener(bgListener);
+//        BackgroundManager.get(MainActivity2.this).addListener(bgListener);
 //        }
 
         // Apply PRNG fixes for Android 4.1
@@ -249,7 +242,7 @@ public class MainActivity2 extends Activity {
         AppUtil.getInstance(MainActivity2.this).deleteBackup();
 
 //        if(Build.VERSION.SDK_INT < Build.VERSION_CODES.O) {
-        BackgroundManager.get(this).removeListener(bgListener);
+//        BackgroundManager.get(this).removeListener(bgListener);
 //        }
 
         super.onDestroy();

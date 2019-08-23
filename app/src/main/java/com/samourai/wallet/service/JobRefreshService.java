@@ -52,7 +52,6 @@ public class JobRefreshService extends JobIntentService {
         boolean launch = intent.getBooleanExtra("launch", false);
         boolean notifTx = intent.getBooleanExtra("notifTx", false);
 
-        Log.d("JobRefreshService", "doInBackground()");
 
         APIFactory.getInstance(this.getApplicationContext()).stayingAlive();
 
@@ -155,6 +154,7 @@ public class JobRefreshService extends JobIntentService {
                 }
 
             }
+            try{
 
             if (!PrefsUtil.getInstance(this.getApplicationContext()).getValue(PrefsUtil.XPUB49LOCK, false)) {
                 String ypub = BIP49Util.getInstance(this.getApplicationContext()).getWallet().getAccount(0).ypubstr();
@@ -174,6 +174,10 @@ public class JobRefreshService extends JobIntentService {
             if (!PrefsUtil.getInstance(this.getApplicationContext()).getValue(PrefsUtil.XPUBPOSTLOCK, false)) {
                 String zpub = BIP84Util.getInstance(this.getApplicationContext()).getWallet().getAccountAt(WhirlpoolMeta.getInstance(this.getApplicationContext()).getWhirlpoolPostmix()).zpubstr();
                 APIFactory.getInstance(this.getApplicationContext()).lockXPUB(zpub, 84, PrefsUtil.XPUBPRELOCK);
+            }
+
+            }catch (Exception ex){
+                ex.printStackTrace();
             }
 
         } else {

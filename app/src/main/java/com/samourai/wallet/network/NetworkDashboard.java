@@ -30,9 +30,9 @@ import com.samourai.wallet.hd.HD_WalletFactory;
 import com.samourai.wallet.network.dojo.DojoConfigureBottomSheet;
 import com.samourai.wallet.segwit.BIP49Util;
 import com.samourai.wallet.segwit.BIP84Util;
-import com.samourai.wallet.service.WebSocketService;
 import com.samourai.wallet.network.dojo.DojoUtil;
 
+import com.samourai.wallet.service.WebSocketJobService;
 import com.samourai.wallet.tor.TorManager;
 import com.samourai.wallet.tor.TorService;
 import com.samourai.wallet.util.AppUtil;
@@ -148,9 +148,9 @@ public class NetworkDashboard extends AppCompatActivity {
                 PrefsUtil.getInstance(getApplicationContext()).setValue(PrefsUtil.ENABLE_TOR, false);
             }
             else {
-                if (AppUtil.getInstance(NetworkDashboard.this.getApplicationContext()).isServiceRunning(WebSocketService.class)) {
-                    stopService(new Intent(NetworkDashboard.this.getApplicationContext(), WebSocketService.class));
-                }
+//                if (AppUtil.getInstance(NetworkDashboard.this.getApplicationContext()).isServiceRunning(WebSocketService.class)) {
+//                    stopService(new Intent(NetworkDashboard.this.getApplicationContext(), WebSocketService.class));
+//                }
                 startTor();
                 PrefsUtil.getInstance(getApplicationContext()).setValue(PrefsUtil.ENABLE_TOR, true);
             }
@@ -378,6 +378,7 @@ public class NetworkDashboard extends AppCompatActivity {
             Intent startIntent = new Intent(getApplicationContext(), TorService.class);
             startIntent.setAction(TorService.START_SERVICE);
             startService(startIntent);
+            WebSocketJobService.cancelJobs(getApplicationContext());
 
         } else {
             Snackbar.make(torButton.getRootView(), R.string.in_offline_mode, Snackbar.LENGTH_LONG)
@@ -390,6 +391,8 @@ public class NetworkDashboard extends AppCompatActivity {
         Intent startIntent = new Intent(getApplicationContext(), TorService.class);
         startIntent.setAction(TorService.STOP_SERVICE);
         startService(startIntent);
+        WebSocketJobService.startJobService(getApplicationContext());
+
     }
 
     @Override

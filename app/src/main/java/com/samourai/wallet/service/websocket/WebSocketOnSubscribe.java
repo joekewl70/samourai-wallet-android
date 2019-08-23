@@ -19,7 +19,9 @@ public class WebSocketOnSubscribe implements FlowableOnSubscribe<SocketEvent> {
 
     public WebSocketOnSubscribe(@NonNull String url) {
         client = new OkHttpClient.Builder()
-                .readTimeout(0, TimeUnit.MILLISECONDS)
+                .connectTimeout(10, TimeUnit.SECONDS)
+                .writeTimeout(10, TimeUnit.SECONDS)
+                .readTimeout(30, TimeUnit.SECONDS)
                 .build();
 
         request = new Request.Builder()

@@ -4,11 +4,14 @@ import android.Manifest;
 import android.app.Activity;
 import android.app.AlertDialog;
 import android.app.ProgressDialog;
+import android.app.job.JobInfo;
+import android.app.job.JobScheduler;
 import android.arch.lifecycle.Observer;
 import android.arch.lifecycle.ViewModelProviders;
 import android.content.BroadcastReceiver;
 import android.content.ClipData;
 import android.content.ClipboardManager;
+import android.content.ComponentName;
 import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
@@ -73,6 +76,7 @@ import com.samourai.wallet.hd.HD_Wallet;
 import com.samourai.wallet.hd.HD_WalletFactory;
 import com.samourai.wallet.send.cahoots.ManualCahootsActivity;
 import com.samourai.wallet.service.JobRefreshService;
+import com.samourai.wallet.service.WebSocketJobService;
 import com.samourai.wallet.utxos.UTXOSActivity;
 import com.samourai.wallet.whirlpool.WhirlpoolMeta;
 import com.samourai.wallet.widgets.ItemDividerDecorator;
@@ -88,7 +92,6 @@ import com.samourai.wallet.send.BlockedUTXO;
 import com.samourai.wallet.send.MyTransactionOutPoint;
 import com.samourai.wallet.send.SweepUtil;
 import com.samourai.wallet.send.UTXO;
-import com.samourai.wallet.service.WebSocketService;
 import com.samourai.wallet.tor.TorManager;
 import com.samourai.wallet.tor.TorService;
 import com.samourai.wallet.tx.TxDetailsActivity;
@@ -336,6 +339,7 @@ public class BalanceActivity extends AppCompatActivity {
             menuFab.toggle(true);
         });
         setBalance(0L, false);
+
         findViewById(R.id.receive_fab).setOnClickListener(view -> {
             menuFab.toggle(true);
 
@@ -409,14 +413,18 @@ public class BalanceActivity extends AppCompatActivity {
             updateDisplay(false);
         }, 100L);
 
-        if (!AppUtil.getInstance(BalanceActivity.this.getApplicationContext()).isServiceRunning(WebSocketService.class)) {
-            startService(new Intent(BalanceActivity.this.getApplicationContext(), WebSocketService.class));
-        }
+
         setUpTor();
         initViewModel();
+        startWebSocketService();
         updateDisplay(false);
         progressBar.setVisibility(View.VISIBLE);
         checkDeepLinks();
+    }
+
+    private void startWebSocketService() {
+        WebSocketJobService.startJobService(getApplicationContext());
+
     }
 
     private void checkDeepLinks() {
@@ -512,6 +520,10 @@ public class BalanceActivity extends AppCompatActivity {
         Intent intent = new Intent("com.samourai.wallet.MainActivity2.RESTART_SERVICE");
         LocalBroadcastManager.getInstance(BalanceActivity.this).sendBroadcast(intent);
 
+        WebSocketJobService.cancelJobs(getApplicationContext());
+        WebSocketJobService.startJobService(getApplicationContext());
+
+
     }
 
     @Override
@@ -520,9 +532,9 @@ public class BalanceActivity extends AppCompatActivity {
 
 //        ibQuickSend.collapse();
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && AppUtil.getInstance(BalanceActivity.this.getApplicationContext()).isServiceRunning(WebSocketService.class)) {
-            stopService(new Intent(BalanceActivity.this.getApplicationContext(), WebSocketService.class));
-        }
+//        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && AppUtil.getInstance(BalanceActivity.this.getApplicationContext()).isServiceRunning(WebSocketService.class)) {
+//            stopService(new Intent(BalanceActivity.this.getApplicationContext(), WebSocketService.class));
+//        }
 
     }
 
@@ -557,9 +569,7 @@ public class BalanceActivity extends AppCompatActivity {
         LocalBroadcastManager.getInstance(BalanceActivity.this).unregisterReceiver(receiver);
         LocalBroadcastManager.getInstance(BalanceActivity.this).unregisterReceiver(receiverDisplay);
 
-        if (AppUtil.getInstance(BalanceActivity.this.getApplicationContext()).isServiceRunning(WebSocketService.class)) {
-            stopService(new Intent(BalanceActivity.this.getApplicationContext(), WebSocketService.class));
-        }
+        WebSocketJobService.cancelJobs(getApplicationContext());
 
         super.onDestroy();
 
@@ -1190,6 +1200,8 @@ public class BalanceActivity extends AppCompatActivity {
     }
 
     private void refreshTx(final boolean notifTx, final boolean dragged, final boolean launch) {
+
+        WebSocketJobService.startJobService(getApplicationContext());
 
         if (AppUtil.getInstance(BalanceActivity.this).isOfflineMode()) {
             Toast.makeText(BalanceActivity.this, R.string.in_offline_mode, Toast.LENGTH_SHORT).show();

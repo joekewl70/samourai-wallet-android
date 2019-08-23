@@ -24,9 +24,9 @@ import com.samourai.wallet.send.PushTx;
 import com.samourai.wallet.send.SendFactory;
 import com.samourai.wallet.send.SuggestedFee;
 import com.samourai.wallet.send.UTXO;
-import com.samourai.wallet.service.WebSocketService;
+import com.samourai.wallet.service.WebSocketJobService;
+import com.samourai.wallet.tor.TorManager;
 import com.samourai.wallet.util.AddressFactory;
-import com.samourai.wallet.util.AppUtil;
 import com.samourai.wallet.util.FormatsUtil;
 import com.samourai.wallet.util.PrefsUtil;
 
@@ -259,10 +259,12 @@ public class CPFPTask extends AsyncTask<String, Void, String> {
                             .setPositiveButton(R.string.ok, new DialogInterface.OnClickListener() {
                                 public void onClick(DialogInterface dialog, int whichButton) {
 
-                                    if (AppUtil.getInstance(activity.getApplicationContext()).isServiceRunning(WebSocketService.class)) {
-                                        activity.stopService(new Intent(activity.getApplicationContext(), WebSocketService.class));
-                                    }
-                                    activity.startService(new Intent(activity.getApplicationContext(), WebSocketService.class));
+//                                    if (AppUtil.getInstance(activity.getApplicationContext()).isServiceRunning(WebSocketService.class)) {
+//                                        activity.stopService(new Intent(activity.getApplicationContext(), WebSocketService.class));
+//                                    }
+                                  if(!TorManager.getInstance(activity.getApplication()).isConnected() ){
+                                      WebSocketJobService.startJobService(activity.getApplicationContext());
+                                  }
 
                                     Transaction tx = SendFactory.getInstance(activity).makeTransaction(0, outPoints, receivers);
                                     if (tx != null) {
