@@ -15,6 +15,7 @@ import com.samourai.wallet.JSONRPC.TrustedNodeUtil;
 import com.samourai.wallet.SamouraiWallet;
 import com.samourai.wallet.bip47.BIP47Meta;
 import com.samourai.wallet.bip47.BIP47Util;
+import com.samourai.wallet.bip47.rpc.NotSecp256k1Exception;
 import com.samourai.wallet.crypto.DecryptionException;
 import com.samourai.wallet.hd.HD_Address;
 import com.samourai.wallet.hd.HD_Wallet;
@@ -64,6 +65,10 @@ import org.bouncycastle.util.encoders.Hex;
 import java.io.IOException;
 import java.math.BigInteger;
 import java.net.URLEncoder;
+import java.security.InvalidKeyException;
+import java.security.NoSuchAlgorithmException;
+import java.security.NoSuchProviderException;
+import java.security.spec.InvalidKeySpecException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -539,6 +544,11 @@ public class APIFactory	{
                             addr = (String)addrObj.get("address");
                             amount = addrObj.getLong("final_balance");
                             String pcode = BIP47Meta.getInstance().getPCode4Addr(addr);
+
+                            if(addrObj.has("pubkey"))    {
+                                bip47Lookahead(pcode, addrObj.getString("pubkey"));
+                            }
+
                             if(addr != null && addr.length() > 0 && pcode != null && pcode.length() > 0 && BIP47Meta.getInstance().getIdx4Addr(addr) != null)    {
                                 int idx = BIP47Meta.getInstance().getIdx4Addr(addr);
                                 if(amount > 0L)    {
@@ -553,7 +563,7 @@ public class APIFactory	{
                                         if(pubkeys.containsKey(pubkey))    {
                                             int count = pubkeys.get(pubkey);
                                             count++;
-                                            if(count == 3)    {
+                                            if(count == BIP47Meta.INCOMING_LOOKAHEAD)    {
                                                 BIP47Meta.getInstance().removeUnspent(pcode, Integer.valueOf(idx));
                                             }
                                             else    {
@@ -705,6 +715,38 @@ public class APIFactory	{
         return false;
 
     }
+
+    private synchronized void bip47Lookahead(String pcode, String addr)  {
+        debug("APIFactory", "bip47Lookahead():" + addr);
+        debug("APIFactory", "bip47Lookahead():" + pcode);
+        debug("APIFactory", "bip47Lookahead():" + BIP47Meta.getInstance().getPCode4Addr(addr));
+        int idx = BIP47Meta.getInstance().getIdx4Addr(addr);
+        debug("APIFactory", "bip47Lookahead():" + idx);
+        try {
+            idx++;
+            for (int i = idx; i < (idx + BIP47Meta.INCOMING_LOOKAHEAD); i++) {
+                info("APIFactory", "receive from " + i + ":" + BIP47Util.getInstance(context).getReceivePubKey(new PaymentCode(pcode), i));
+                BIP47Meta.getInstance().getIdx4AddrLookup().put(BIP47Util.getInstance(context).getReceivePubKey(new PaymentCode(pcode), i), i);
+                BIP47Meta.getInstance().getPCode4AddrLookup().put(BIP47Util.getInstance(context).getReceivePubKey(new PaymentCode(pcode), i), pcode.toString());
+//                    _addrs.add(BIP47Util.getInstance(RefreshService.this).getReceivePubKey(new PaymentCode(pcode), i));
+            }
+
+            idx--;
+            if (idx >= 2) {
+                for (int i = idx; i >= (idx - (BIP47Meta.INCOMING_LOOKAHEAD - 1)); i--) {
+                    info("APIFactory", "receive from " + i + ":" + BIP47Util.getInstance(context).getReceivePubKey(new PaymentCode(pcode), i));
+                    BIP47Meta.getInstance().getIdx4AddrLookup().put(BIP47Util.getInstance(context).getReceivePubKey(new PaymentCode(pcode), i), i);
+                    BIP47Meta.getInstance().getPCode4AddrLookup().put(BIP47Util.getInstance(context).getReceivePubKey(new PaymentCode(pcode), i), pcode.toString());
+//                        _addrs.add(BIP47Util.getInstance(context).getReceivePubKey(new PaymentCode(pcode), i));
+                }
+            }
+
+//                addrs = _addrs.toArray(new String[_addrs.size()]);
+        } catch (NullPointerException | NotSecp256k1Exception | InvalidKeyException | NoSuchAlgorithmException | NoSuchProviderException | InvalidKeySpecException e) {
+            ;
+        }
+    }
+
     /*
         public synchronized JSONObject deleteXPUB(String xpub, boolean bip49) {
 
@@ -1262,7 +1304,7 @@ public class APIFactory	{
                 if(utxoArray == null || utxoArray.length() == 0) {
                     return false;
                 }
-                utxos.clear();
+
                 for (int i = 0; i < utxoArray.length(); i++) {
 
                     JSONObject outDict = utxoArray.getJSONObject(i);
@@ -1305,6 +1347,9 @@ public class APIFactory	{
                             BIP47Meta.getInstance().getIdx4AddrLookup().put(address, idx);
                             String pcode = BIP47Meta.getInstance().getPCode4AddrLookup().get(outDict.getString("pubkey"));
                             BIP47Meta.getInstance().getPCode4AddrLookup().put(address, pcode);
+
+                            debug("APIFactory", outDict.getString("pubkey") + "," + pcode);
+                            debug("APIFactory", outDict.getString("pubkey") + "," + idx);
                         }
                         else    {
                             ;
@@ -1340,10 +1385,20 @@ public class APIFactory	{
 
                     }
                     catch(Exception e) {
-                        ;
+                        e.printStackTrace();
                     }
 
                 }
+
+                long amount = 0L;
+                for(String key : utxos.keySet())   {
+                    for(MyTransactionOutPoint out : utxos.get(key).getOutpoints())    {
+                        debug("APIFactory", "utxo:" + out.getAddress() + "," + out.getValue());
+                        debug("APIFactory", "utxo:" + utxos.get(key).getPath());
+                        amount += out.getValue().longValue();
+                    }
+                }
+                debug("APIFactory", "utxos by value (post-parse):" + amount);
 
                 return true;
 
@@ -1654,6 +1709,15 @@ public class APIFactory	{
                         addressStrings.add(addr);
                     }
                 }
+                List<Integer> idxs = BIP47Meta.getInstance().getUnspent(pcode);
+                for(Integer idx : idxs)   {
+                    String receivePubKey = BIP47Util.getInstance(context).getReceivePubKey(new PaymentCode(pcode), idx);
+                    BIP47Meta.getInstance().getIdx4AddrLookup().put(receivePubKey, idx);
+                    BIP47Meta.getInstance().getPCode4AddrLookup().put(receivePubKey, pcode.toString());
+                    if(!addressStrings.contains(receivePubKey))    {
+                        addressStrings.add(receivePubKey);
+                    }
+                }
             }
             if(addressStrings.size() > 0)    {
                 s = addressStrings.toArray(new String[0]);
@@ -1713,12 +1777,6 @@ public class APIFactory	{
                     seenOutputs.add(_o.getTxHash().toString() + "-" + _o.getTxOutputN());
                 }
             }
-
-            for(String _s : UTXOUtil.getInstance().getTags().keySet())   {
-                if(!seenOutputs.contains(_s))    {
-                    UTXOUtil.getInstance().remove(_s);
-                }
-            }
             for(String _s : BlockedUTXO.getInstance().getNotDustedUTXO())   {
 //                debug("APIFactory", "not dusted:" + _s);
                 if(!seenOutputs.contains(_s))    {
@@ -1734,7 +1792,7 @@ public class APIFactory	{
                 }
             }
 
-//            String strPreMix = BIP84Util.getInstance(context).getWallet().getAccountAt(WhirlpoolMeta.getInstance(context).getWhirlpoolPremixAccount()).xpubstr();
+            //            String strPreMix = BIP84Util.getInstance(context).getWallet().getAccountAt(WhirlpoolMeta.getInstance(context).getWhirlpoolPremixAccount()).xpubstr();
             String strPostMix = BIP84Util.getInstance(context).getWallet().getAccountAt(WhirlpoolMeta.getInstance(context).getWhirlpoolPostmix()).xpubstr();
 //            JSONObject preMultiAddrObj = getRawXPUB(new String[] { strPreMix });
 //            JSONObject preUnspentObj = getRawUnspentOutputs(new String[] { strPreMix });
@@ -1752,6 +1810,40 @@ public class APIFactory	{
 //            debug("APIFactory", "post-mix unspent:" + parsedPostUnspent);
 //            debug("APIFactory", "post-mix multi:" + getXpubPostMixBalance());
 //            debug("APIFactory", "post-mix unspent:" + getUtxosPostMix().size());
+
+            //
+            //
+            //
+            List<String> seenOutputsPostMix = new ArrayList<String>();
+            List<UTXO> _utxosPostMix = getUtxosPostMix(false);
+            for(UTXO _u : _utxosPostMix)   {
+                for(MyTransactionOutPoint _o : _u.getOutpoints())   {
+                    seenOutputsPostMix.add(_o.getTxHash().toString() + "-" + _o.getTxOutputN());
+                }
+            }
+
+            for(String _s : UTXOUtil.getInstance().getTags().keySet())   {
+                if(!seenOutputsPostMix.contains(_s) && !seenOutputs.contains(_s))    {
+                    UTXOUtil.getInstance().remove(_s);
+                }
+            }
+
+            /*
+            for(String _s : BlockedUTXO.getInstance().getNotDustedUTXO())   {
+//                debug("APIFactory", "not dusted:" + _s);
+                if(!seenOutputsPostMix.contains(_s))    {
+                    BlockedUTXO.getInstance().removeNotDusted(_s);
+//                    debug("APIFactory", "not dusted removed:" + _s);
+                }
+            }
+            */
+            for(String _s : BlockedUTXO.getInstance().getBlockedUTXOPostMix().keySet())   {
+                debug("APIFactory", "blocked post-mix:" + _s);
+                if(!seenOutputsPostMix.contains(_s))    {
+                    BlockedUTXO.getInstance().removePostMix(_s);
+                    debug("APIFactory", "blocked removed:" + _s);
+                }
+            }
 
         }
         catch (IndexOutOfBoundsException ioobe) {
@@ -1816,6 +1908,7 @@ public class APIFactory	{
                                         count++;
                                         if(count == 3)    {
                                             BIP47Meta.getInstance().removeUnspent(pcode, Integer.valueOf(idx));
+                                            info("APIFactory", "BIP47 remove unspent:" + pcode + ":" + idx);
                                         }
                                         else    {
                                             pubkeys.put(pubkey, count + 1);
@@ -1956,6 +2049,16 @@ public class APIFactory	{
 
     public List<UTXO> getUtxos(boolean filter) {
 
+        long amount = 0L;
+        for(String key : utxos.keySet())   {
+            for(MyTransactionOutPoint out : utxos.get(key).getOutpoints())    {
+                debug("APIFactory", "utxo:" + out.getAddress() + "," + out.getValue());
+                debug("APIFactory", "utxo:" + utxos.get(key).getPath());
+                amount += out.getValue().longValue();
+            }
+        }
+        debug("APIFactory", "utxos by value:" + amount);
+
         List<UTXO> unspents = new ArrayList<UTXO>();
 
         if(filter)    {
@@ -1983,7 +2086,7 @@ public class APIFactory	{
         if(utxos.isEmpty() && useLocalCache){
             try {
                 String response  = PayloadUtil.getInstance(context).deserializeUTXO().toString();
-                parseUnspentOutputsForSweep(response);
+                parseUnspentOutputs(response);
             } catch (IOException e) {
                 e.printStackTrace();
             } catch (JSONException e) {
